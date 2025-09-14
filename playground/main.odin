@@ -112,6 +112,7 @@ main :: proc(){
         
         gl.UseProgram(shader)
         gl.Uniform2f(uniforms["resolution"].location, 800, 600)
+        gl.Uniform1f(uniforms["time"].location, f32(sdl3.GetTicks())/1000.0)
         gl.BindVertexArray(quad_vao)
 
         gl.DrawArrays(gl.TRIANGLES, 0, 6)
