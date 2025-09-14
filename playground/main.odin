@@ -67,7 +67,8 @@ main :: proc(){
     }else{
         fmt.printfln("Shaders loaded")
     }
-    
+    stat, err := os.stat(FRAGMENT_SHADER_PATH)
+    last_modification := stat.modification_time
 
     loop:
     for{
@@ -89,6 +90,19 @@ main :: proc(){
                         }
                     }
             }
+        }
+        
+        if stat, err = os.stat(FRAGMENT_SHADER_PATH); time.diff(last_modification, stat.modification_time) != 0{
+            shader, ok = gl.load_shaders_file(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH)
+            uniforms = gl.get_uniforms_from_program(shader)
+
+            if !ok {
+                a, b, c, d := gl.get_last_error_messages()
+                fmt.printfln("Could not compile shaders\n %s\n %s", a, c)
+            }else{
+                fmt.printfln("Shaders loaded")
+            }
+            last_modification = stat.modification_time
         }
 
         
