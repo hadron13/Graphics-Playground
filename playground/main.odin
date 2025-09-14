@@ -3,6 +3,8 @@ package playground
 import "vendor:sdl3"
 import gl "vendor:OpenGL"
 import "core:fmt"
+import "core:os"
+import "core:time"
 
 main :: proc(){
     if(!sdl3.Init({.VIDEO , .EVENTS})){
@@ -52,7 +54,11 @@ main :: proc(){
     gl.BindVertexArray(0)
 
 
-    shader, ok := gl.load_shaders_file("playground/shaders/generic.vert.glsl", "playground/shaders/raymarch.frag.glsl")
+    VERTEX_SHADER_PATH :: "playground/shaders/generic.vert.glsl"
+    FRAGMENT_SHADER_PATH :: "playground/shaders/raymarch.frag.glsl"
+
+    shader, ok := gl.load_shaders_file( VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH)
+    uniforms := gl.get_uniforms_from_program(shader)
 
     if !ok {
         a, b, c, d := gl.get_last_error_messages()
@@ -61,6 +67,7 @@ main :: proc(){
     }else{
         fmt.printfln("Shaders loaded")
     }
+    
 
     loop:
     for{
@@ -69,12 +76,28 @@ main :: proc(){
             #partial switch(event.type){
                 case .QUIT:
                     break loop
+                case .KEY_UP:
+                    if(event.key.key == sdl3.GetKeyFromName("r")){
+                        shader, ok = gl.load_shaders_file(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH)
+                        uniforms = gl.get_uniforms_from_program(shader)
+
+                        if !ok {
+                            a, b, c, d := gl.get_last_error_messages()
+                            fmt.printfln("Could not compile shaders\n %s\n %s", a, c)
+                        }else{
+                            fmt.printfln("Shaders loaded")
+                        }
+                    }
             }
         }
+
+        
+
         gl.ClearColor(0.1, 0.1, 0.1, 1.0)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         
         gl.UseProgram(shader)
+        gl.Uniform2f(uniforms["resolution"].location, 800, 600)
         gl.BindVertexArray(quad_vao)
 
         gl.DrawArrays(gl.TRIANGLES, 0, 6)
