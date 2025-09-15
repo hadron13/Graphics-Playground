@@ -16,7 +16,7 @@ main :: proc(){
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_MINOR_VERSION, 3)
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_PROFILE_MASK, i32(sdl3.GLProfile.CORE))
 
-    window := sdl3.CreateWindow("Playground", 800, 600, {.OPENGL})
+    window := sdl3.CreateWindow("Playground", 1000, 1400, {.OPENGL})
     defer sdl3.DestroyWindow(window)
 
     gl_context := sdl3.GL_CreateContext(window)
@@ -111,7 +111,7 @@ main :: proc(){
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         
         gl.UseProgram(shader)
-        gl.Uniform2f(uniforms["resolution"].location, 800, 600)
+        gl.Uniform2f(uniforms["resolution"].location, 1000, 1400)
         gl.Uniform1f(uniforms["time"].location, f32(sdl3.GetTicks())/1000.0)
         gl.BindVertexArray(quad_vao)
 
