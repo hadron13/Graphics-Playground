@@ -27,9 +27,8 @@ mat4 rotateY(float theta) {
     );
 }
 
-vec3 repeated(vec3 position, vec3 size){
-    return position - size*round(position/size);
-
+vec3 repeated(vec3 position, vec3 spacing){
+    return position - spacing * round(position/spacing);
 }
 
 float sphere(vec3 origin, float radius, vec3 position){
@@ -54,13 +53,13 @@ float difference (float a, float b){
 }
 
 float map(vec3 position){
-    // return difference(sphere(vec3(-0.25, 0, 2.0), 0.5, position), sphere(vec3(0.25, 0.0, 1.8), 0.5, position));
-    return difference(intersection(box(vec3(0, 0, 1.5), vec3(0.5), position), sphere(vec3(0, 0, 1.5), 0.65, position)), sphere(vec3(0, 0, 1.5), 0.6, position));
+    position = repeated(position, vec3(3.0));
+    float dist = sphere(vec3(0, 0, 1.5), 0.4, position);
+    return dist;
 }
 
 vec3 normal(vec3 position){
-    float d = map(position);
-    float eps = 0.000001;
+    float eps = 0.00001;
     return normalize(vec3( 
         map(position + vec3(eps, 0, 0)) - map(position - vec3(eps, 0, 0)),
         map(position + vec3(0, eps, 0)) - map(position - vec3(0, eps, 0)),
@@ -73,25 +72,41 @@ void main(){
     vec2 uv = gl_FragCoord.xy/resolution.y - vec2((resolution.x/resolution.y - 1.0)/2.0, 0);
     vec2 centered_uv = (uv - 0.5)*2;
 
-    vec3 ray_position = vec3(sin(time), 0, cos(time) + 0.75) * 2.0;
-    mat4 view = viewMatrix(ray_position, ray_position + vec3(sin(time), 0, cos(time)), vec3(0, 1.0, 0));
+    // vec3 ray_position = vec3(sin(time), 0, cos(time) + 0.75) * 2;
+    vec3 ray_position = vec3(0);
+    mat4 view = viewMatrix(ray_position, vec3(0, 0, -1.0), vec3(0, 1.0, 0));
     
     vec3 ray_direction = normalize(vec3(centered_uv, 1.0));
     ray_direction = (view * vec4(ray_direction, 1.0)).xyz;
 
     vec3 sphere_origin = vec3(0, 0, 2.0);
-    vec3 light_direction = normalize(vec3(0.5, 0.0, -1.0));  
 
     vec3 color = vec3(0);
 
-    for(int i = 0; i < 50; i++){
+    for(int i = 0; i < 100; i++){
         float dist = map(ray_position);
         ray_position += ray_direction * dist; 
 
-        if(dist < 0.001){
+        if(dist < 0.00001){
             vec3 normal = normal(ray_position);
-            color = vec3(dot(normal, light_direction));
-            // color = vec3(1);
+
+            vec3 obj_color = vec3(0.86, 0.61, 0.10);
+            vec3 light_color = vec3(1.0);
+            vec3 light_position = vec3(1.0, 1.0, 0.0);
+
+            vec3 light_direction = normalize(light_position - ray_position);
+            vec3 reflect_direction = reflect(-light_direction, normal);  
+
+            float light_distance = length(light_position - ray_position);
+            float attenuation = 1.0 / (0.0 + 0.5 * light_distance + 0.3 * light_distance * light_distance); 
+            
+            vec3 ambient = 0.1 * light_color * attenuation;
+            vec3 diffuse = (max(dot(normal, light_direction), 0)) * light_color * attenuation;
+            vec3 specular = pow(max(dot(-ray_direction, reflect_direction), 0.0), 16) * 0.5 * light_color * attenuation;
+
+
+            color = (ambient + diffuse + specular) * obj_color;
+
             break;
         }
     }
