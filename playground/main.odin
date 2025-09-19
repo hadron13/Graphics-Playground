@@ -5,6 +5,7 @@ import gl "vendor:OpenGL"
 import "core:fmt"
 import "core:os"
 import "core:time"
+import "core:c"
 
 main :: proc(){
     if(!sdl3.Init({.VIDEO , .EVENTS})){
@@ -16,7 +17,7 @@ main :: proc(){
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_MINOR_VERSION, 3)
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_PROFILE_MASK, i32(sdl3.GLProfile.CORE))
 
-    window := sdl3.CreateWindow("Playground", 1000, 1400, {.OPENGL})
+    window := sdl3.CreateWindow("Playground", 1000, 1400, {.OPENGL, .RESIZABLE})
     defer sdl3.DestroyWindow(window)
 
     gl_context := sdl3.GL_CreateContext(window)
@@ -70,6 +71,9 @@ main :: proc(){
     stat, err := os.stat(FRAGMENT_SHADER_PATH)
     last_modification := stat.modification_time
 
+    width, height : c.int
+    sdl3.GetWindowSize(window, &width, &height)
+
     loop:
     for{
         event : sdl3.Event
@@ -89,6 +93,11 @@ main :: proc(){
                             fmt.printfln("Shaders loaded")
                         }
                     }
+                case .WINDOW_RESIZED:
+                    width, height : c.int
+                    sdl3.GetWindowSize(window, &width, &height)
+                    gl.Viewport(0, 0, width, height)
+                
             }
         }
         
@@ -107,11 +116,11 @@ main :: proc(){
 
         
 
+        gl.UseProgram(shader) 
+        gl.Uniform2f(uniforms["resolution"].location, f32(width), f32(height));
         gl.ClearColor(0.1, 0.1, 0.1, 1.0)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
         
-        gl.UseProgram(shader)
-        gl.Uniform2f(uniforms["resolution"].location, 1000, 1400)
         gl.Uniform1f(uniforms["time"].location, f32(sdl3.GetTicks())/1000.0)
         gl.BindVertexArray(quad_vao)
 
