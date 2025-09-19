@@ -16,6 +16,7 @@ main :: proc(){
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_MAJOR_VERSION, 3)
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_MINOR_VERSION, 3)
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_PROFILE_MASK, i32(sdl3.GLProfile.CORE))
+    sdl3.GL_SetAttribute(sdl3.GLAttr.FRAMEBUFFER_SRGB_CAPABLE, 1)
 
     window := sdl3.CreateWindow("Playground", 1000, 1400, {.OPENGL, .RESIZABLE})
     defer sdl3.DestroyWindow(window)
@@ -29,6 +30,8 @@ main :: proc(){
 
     fmt.printfln("loaded OpenGL version %s", gl.GetString(gl.VERSION))
     fmt.printfln("vendor: %s", gl.GetString(gl.VENDOR) )
+    
+    gl.Enable(gl.FRAMEBUFFER_SRGB)
 
     quad : []f32 = {
        -1.0,-1.0,
@@ -94,7 +97,6 @@ main :: proc(){
                         }
                     }
                 case .WINDOW_RESIZED:
-                    width, height : c.int
                     sdl3.GetWindowSize(window, &width, &height)
                     gl.Viewport(0, 0, width, height)
                 
