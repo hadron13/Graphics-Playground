@@ -94,10 +94,14 @@ material map_material (vec3 position){
     if(position.x > 1.49){
         return material(vec3(0, 1.0, 0),  1.0, 0.0);
     }
-    if(position.z > 2.9){
-        return material(vec3(1.0),  1.0, 1.0);
+    if(position.x > 0.0 && position.z < 2.0){
+        // return material(vec3(1.00, 0.843, 0.0), 0.9, 0.0);
     }
-    return material(vec3(1.00, 0.843, 0.0), 0.2, 1.0);
+    if(position.z > 2.9){
+        return material(vec3(1.0),  1.0, 0.0);
+    }
+    // return material(vec3(1.00, 0.843, 0.0), 0.2, 1.0);
+    return material(vec3(1.0), 0.0, 1.0);
 }
 
 
@@ -113,7 +117,7 @@ vec3 normal(vec3 position){
 float shadow(vec3 position, vec3 to_light_direction, float min_t, float max_t){
     float res = 1.0;
     float t = min_t;
-    for(int i = 0; i < 32 && t < max_t; i++){
+    for(int i = 0; i < 64 && t < max_t; i++){
         float dist = map(position + to_light_direction * t);
         if(dist < 0.001){
             return 0.0;
@@ -123,12 +127,13 @@ float shadow(vec3 position, vec3 to_light_direction, float min_t, float max_t){
     }
     return res;
 }
-//
-// vec3 directional_light(
-//     in vec3 position,
-//     in vec3 view, 
-//
-// )
+
+
+#define FRESNEL_BALANCE 0.05
+float fresnel_factor(vec3 view_direction, vec3 normal) {
+    float fresnelDot = 1.0 - max(dot(-view_direction, normal), 0.0);
+    return FRESNEL_BALANCE + (1.0 - FRESNEL_BALANCE * pow(fresnelDot, 5.0));
+}
 
 
 vec3 render(in vec3 position, 
@@ -139,50 +144,54 @@ vec3 render(in vec3 position,
     vec3 normal = normal(position);
 
     vec3 light_color = vec3(1.0);
-    vec3 light_position = vec3(1.0, 1.0, -0.5);
+    vec3 light_position = vec3(sin(time), 1.0, 1.8 + cos(time));
 
     vec3 light_direction = normalize(light_position - position);
     vec3 reflect_direction = reflect(-light_direction, normal);  
     vec3 halfway_direction = -normalize(-light_direction + view);
 
     float light_distance = length(light_position - position);
-    float attenuation = 4.0 / (0.0 + 0.5 * light_distance + 0.1 * light_distance * light_distance); 
+    float attenuation = 0.3 / (0.3 + 0.5 * light_distance + 0.5 * light_distance * light_distance); 
     float shadow = shadow(position, light_direction, 0.01, light_distance);
 
     material mat = map_material(position);
-    
-    float roughness = 0.2;
    
     float shininess = pow(65535.0, 1.0 - mat.roughness);
-    vec3 obj_color = mat.albedo;
     
     float spec_normalization = ((shininess + 2.0) * (shininess + 4.0)) / (8.0 * PI * (pow(2.0, -shininess * 0.5) + shininess));
     spec_normalization = max(spec_normalization - 0.3496155267919281, 0.0) * PI;
 
+    float diffuse_factor = max(dot(normal, light_direction), 0)  * shadow ;
+    float specular_factor = pow(max(dot(normal, halfway_direction), 0.0), shininess) * diffuse_factor * shadow * spec_normalization;
 
-    ambient  = 0.00  * attenuation * light_color;
-    diffuse  = 0.02  * attenuation * max(dot(normal, light_direction), 0) * obj_color * shadow ;
-    specular = 0.99  * attenuation * pow(max(dot(normal, halfway_direction), 0.0), shininess) * obj_color * shadow * spec_normalization;
-    vec3 color = (ambient + diffuse + specular) * obj_color;
-    
+    ambient  = 0.10  * attenuation * mat.albedo;
+    diffuse  = 1.00  * attenuation * diffuse_factor * mat.albedo;
+    specular = 1.00  * attenuation * specular_factor * light_color;
+    specular *= fresnel_factor(view, normal);
+
+    vec3 color = mix(ambient + diffuse + specular, specular_factor * mat.albedo, mat.metallic);
+
+    // vec3 color = ambient + diffuse + specular * mat.albedo;
 
     return color;
 }
 
-vec3 reflection(inout vec3 position, vec3 incident, float min_t, float max_t, float metallic){ 
+
+vec3 reflection(inout vec3 position, inout vec3 incident, float min_t, float max_t, material mat ){ 
     float t = min_t;
     
     vec3 normal = normal(position);
     vec3 ray_direction = reflect(incident, normal);
 
-    for(int i = 0; i < 64 && t < max_t; i++){
+    for(int i = 0; i < 128 && t < max_t; i++){
         float dist = map(position + ray_direction * t);
-        if(dist < 0.0001){
+        if(dist < 0.00001){
             vec3 ambient, diffuse, specular;
             position = position + ray_direction * t; 
+            incident = ray_direction;
             vec3 reflection = render(position, ray_direction, ambient, diffuse, specular);
             
-            return mix(vec3(0), reflection, metallic);
+            return mix(vec3(0), reflection * mat.albedo, mat.metallic);
         }
         t += dist;
     }
@@ -216,11 +225,18 @@ void main(){
             // vec3 obj_color = map_color(ray_position);
 
             render(ray_position, ray_direction, ambient, diffuse, specular);
+            
+            int bounces = 4;
+            for(int i = 0; i < bounces; i++){
+                specular += reflection(ray_position, ray_direction, 0.01, 20.0, mat);
+                material bounced_mat = map_material(ray_position);
+                if(bounced_mat.roughness > 0.9){
+                    break;
+                }
+            }
 
-            specular += obj_color * reflection(ray_position, ray_direction, 0.01, 20.0, mat.metallic);
-            specular += obj_color * reflection(ray_position, ray_direction, 0.01, 20.0, mat.metallic);
-
-            color = (ambient + diffuse + specular) * obj_color;
+            color = mix(ambient + diffuse + specular, specular * mat.albedo, mat.metallic);
+            // color = (ambient + diffuse + specular) * obj_color;
             break;
         }
     }
