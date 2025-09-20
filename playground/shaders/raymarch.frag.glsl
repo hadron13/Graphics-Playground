@@ -72,40 +72,34 @@ float map(vec3 position){
     float dist = sphere(vec3(-0.3, 0, 2.0), 0.25, position);
     dist = join (dist, sphere(vec3(0.3, 0.05, 1.7), 0.3, position));
     dist = join(dist, position.y + 0.25);
-    // dist = join(dist, position.x + 1.5);
-    // dist = join(dist, 1.5 - position.x);
-    // dist = join(dist, 3.0 - position.z);
+    dist = join(dist, position.x + 1.5);
+    dist = join(dist, 1.5 - position.x);
+    dist = join(dist, 3.0 - position.z);
     return dist;
 }
 
 struct material{
-    vec3 diffuse_color;
-    vec3 specular_color;
+    vec3 albedo;
     float roughness;
     float metallic;
 };
 
 material map_material (vec3 position){
-    return material(vec3(1.0), vec3(1.0), 0.5, 1.0);
-}
-
-vec3 map_color(vec3 position){
     if(position.y < -0.24){
-        return vec3(1.0);
-        // return ((mod(position.x, 2.0) < 1.0)?vec3(1.0):vec3(0.5));
+        return material(vec3(1.0),  1.0, 0.0);
     }
     if(position.x < -1.49){
-        return vec3(1.0, 0, 0);
+        return material(vec3(1.0, 0, 0),  1.0, 0.0);
     }
     if(position.x > 1.49){
-        return vec3(0, 1.0, 0);
+        return material(vec3(0, 1.0, 0),  1.0, 0.0);
     }
     if(position.z > 2.9){
-        return vec3(1.0);
+        return material(vec3(1.0),  1.0, 1.0);
     }
-
-    return vec3(1.00, 0.843, 0.0);
+    return material(vec3(1.00, 0.843, 0.0), 0.2, 1.0);
 }
+
 
 vec3 normal(vec3 position){
     float eps = 0.00001;
@@ -143,9 +137,7 @@ vec3 render(in vec3 position,
             out vec3 diffuse, 
             out vec3 specular){
     vec3 normal = normal(position);
-    material mat = map_material(position);
 
-    vec3 obj_color = map_color(position);
     vec3 light_color = vec3(1.0);
     vec3 light_position = vec3(1.0, 1.0, -0.5);
 
@@ -157,8 +149,13 @@ vec3 render(in vec3 position,
     float attenuation = 4.0 / (0.0 + 0.5 * light_distance + 0.1 * light_distance * light_distance); 
     float shadow = shadow(position, light_direction, 0.01, light_distance);
 
+    material mat = map_material(position);
+    
     float roughness = 0.2;
-    float shininess = pow(65535.0, 1.0 - roughness);
+   
+    float shininess = pow(65535.0, 1.0 - mat.roughness);
+    vec3 obj_color = mat.albedo;
+    
     float spec_normalization = ((shininess + 2.0) * (shininess + 4.0)) / (8.0 * PI * (pow(2.0, -shininess * 0.5) + shininess));
     spec_normalization = max(spec_normalization - 0.3496155267919281, 0.0) * PI;
 
@@ -172,7 +169,7 @@ vec3 render(in vec3 position,
     return color;
 }
 
-vec3 reflection(inout vec3 position, vec3 incident, float min_t, float max_t){ 
+vec3 reflection(inout vec3 position, vec3 incident, float min_t, float max_t, float metallic){ 
     float t = min_t;
     
     vec3 normal = normal(position);
@@ -183,7 +180,9 @@ vec3 reflection(inout vec3 position, vec3 incident, float min_t, float max_t){
         if(dist < 0.0001){
             vec3 ambient, diffuse, specular;
             position = position + ray_direction * t; 
-            return render(position, ray_direction, ambient, diffuse, specular);
+            vec3 reflection = render(position, ray_direction, ambient, diffuse, specular);
+            
+            return mix(vec3(0), reflection, metallic);
         }
         t += dist;
     }
@@ -212,12 +211,14 @@ void main(){
 
         if(dist < 0.0001){
             vec3 ambient, diffuse, specular;
-            vec3 obj_color = map_color(ray_position);
+            material mat = map_material(ray_position);
+            vec3 obj_color = mat.albedo;
+            // vec3 obj_color = map_color(ray_position);
 
             render(ray_position, ray_direction, ambient, diffuse, specular);
 
-            specular += obj_color * reflection(ray_position, ray_direction, 0.01, 20.0);
-            specular += obj_color * reflection(ray_position, ray_direction, 0.01, 20.0);
+            specular += obj_color * reflection(ray_position, ray_direction, 0.01, 20.0, mat.metallic);
+            specular += obj_color * reflection(ray_position, ray_direction, 0.01, 20.0, mat.metallic);
 
             color = (ambient + diffuse + specular) * obj_color;
             break;
