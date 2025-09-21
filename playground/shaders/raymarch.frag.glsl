@@ -95,10 +95,10 @@ material map_material (vec3 position){
         return material(vec3(0, 1.0, 0),  1.0, 0.0);
     }
     if(position.x > 0.0 && position.z < 2.0){
-        // return material(vec3(1.00, 0.843, 0.0), 0.9, 0.0);
+        return material(vec3(1.00, 0.843, 0.0), 0.5, 1.0);
     }
     if(position.z > 2.9){
-        return material(vec3(1.0),  1.0, 0.0);
+        return material(vec3(1.0),  0.0, 1.0);
     }
     // return material(vec3(1.00, 0.843, 0.0), 0.2, 1.0);
     return material(vec3(1.0), 0.0, 1.0);
@@ -176,6 +176,25 @@ vec3 render(in vec3 position,
     return color;
 }
 
+vec3 randomDirectionCone(vec3 base, vec2 seed, float maxAngle) {
+    float phi = 2.0 * 3.14159265359 * fract(sin(dot(seed, vec2(127.1, 311.7))) * 43758.5453123);
+    float cosThetaMax = cos(maxAngle);
+    float u = fract(sin(dot(seed + vec2(1.0), vec2(127.1, 311.7))) * 43758.5453123);
+    float cosTheta = mix(cosThetaMax, 1.0, u); // Interpolate within cone
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    
+    vec3 randomDir = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
+    
+    vec3 n = normalize(base);
+    vec3 uAxis = abs(n.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+    vec3 tangent = normalize(cross(n, uAxis));
+    vec3 bitangent = cross(n, tangent);
+    
+    vec3 rotatedDir = randomDir.x * tangent + randomDir.y * bitangent + randomDir.z * n;
+    
+    float magnitude = length(base);
+    return rotatedDir * magnitude;
+}
 
 vec3 reflection(inout vec3 position, inout vec3 incident, float min_t, float max_t, material mat ){ 
     float t = min_t;
@@ -183,7 +202,7 @@ vec3 reflection(inout vec3 position, inout vec3 incident, float min_t, float max
     vec3 normal = normal(position);
     vec3 ray_direction = reflect(incident, normal);
 
-    for(int i = 0; i < 128 && t < max_t; i++){
+    for(int i = 0; i < 512 && t < max_t; i++){
         float dist = map(position + ray_direction * t);
         if(dist < 0.00001){
             vec3 ambient, diffuse, specular;
@@ -204,10 +223,10 @@ void main(){
     vec2 uv = gl_FragCoord.xy/resolution.y - vec2((resolution.x/resolution.y - 1.0)/2.0, 0);
     vec2 centered_uv = (uv - 0.5)*2;
 
-    vec3 ray_position = vec3(0, 0, 0);
+    vec3 ray_position = vec3(0, 1.0, 0);
 
         // vec3(-0.5, 0.5, -1.5)
-    mat4 view = viewMatrix(ray_position, normalize(vec3(0, 0, -1)), vec3(0, 1.0, 0));
+    mat4 view = viewMatrix(ray_position, ray_position + normalize(vec3(0, 0, -1)), vec3(0, 1.0, 0));
     
     vec3 ray_direction = normalize(vec3(centered_uv, 1.0));
     ray_direction = (view * vec4(ray_direction, 1.0)).xyz;
@@ -227,12 +246,13 @@ void main(){
             render(ray_position, ray_direction, ambient, diffuse, specular);
             
             int bounces = 4;
+            material bounced_mat = mat;
             for(int i = 0; i < bounces; i++){
-                specular += reflection(ray_position, ray_direction, 0.01, 20.0, mat);
-                material bounced_mat = map_material(ray_position);
-                if(bounced_mat.roughness > 0.9){
+                if(bounced_mat.metallic < 0.1){ //todo: swap for roughness later
                     break;
                 }
+                specular += reflection(ray_position, ray_direction, 0.01, 20.0, bounced_mat);
+                bounced_mat = map_material(ray_position);
             }
 
             color = mix(ambient + diffuse + specular, specular * mat.albedo, mat.metallic);
