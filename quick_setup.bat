@@ -2,3 +2,4 @@ curl -L https://github.com/odin-lang/Odin/releases/download/dev-2025-04/odin-win
 mkdir odin 
 powershell -command "Expand-Archive -Path 'odin.zip' -DestinationPath '.\odin'"
 del odin.zip
+copy odin\vendor\sdl3\SDL3.dll .
