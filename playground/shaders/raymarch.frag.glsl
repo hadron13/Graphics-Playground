@@ -99,7 +99,7 @@ material map_material (vec3 position){
         return material(vec3(0, 1.0, 0),  1.0, 0.0);
     }
     if(position.x > 0.0 && position.z < 2.0){
-        return material(vec3(1.00, 0.843, 0.0), 1.0, 1.0);
+        return material(vec3(1.00, 0.843, 0.0), 0.5, 1.0);
     }
     if(position.z > 2.9){
         return material(vec3(1.0),  0.0, 1.0);
@@ -181,48 +181,6 @@ vec3 render(in vec3 position,
     return color;
 }
 
-
-vec2 SampleUniformDiskConcentric(vec2 u) {
-    // Map _u_ to $[-1,1]^2$ and handle degeneracy at the origin
-    vec2 uOffset = 2 * u - vec2(1.0);
-    if (uOffset.x == 0 && uOffset.y == 0)
-        return vec2(0);
-
-    // Apply concentric mapping to point
-    float theta, r;
-    if (abs(uOffset.x) > abs(uOffset.y)) {
-        r = uOffset.x;
-        theta = PI/4.0 * (uOffset.y / uOffset.x);
-    } else {
-        r = uOffset.y;
-        theta = PI/2.0 - PI/4.0 * (uOffset.x / uOffset.y);
-    }
-    return r * vec2(cos(theta), sin(theta));
-}
-
-vec3 randomDirectionCone(vec3 base, vec2 seed, float maxAngle) {
-    float phi = 2.0 * 3.14159265359 * fract(sin(dot(seed, vec2(127.1, 311.7))) * 43758.5453123);
-    float cosThetaMax = cos(maxAngle);
-    float u = fract(sin(dot(seed + vec2(1.0), vec2(127.1, 311.7))) * 43758.5453123);
-    vec2 sample = SampleUniformDiskConcentric(seed);
-    float cosTheta = mix(cosThetaMax, 1.0, sample.x); // Interpolate within cone
-    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
-    
-    vec3 randomDir = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
-    
-    vec3 n = normalize(base);
-    vec3 uAxis = abs(n.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-    vec3 tangent = normalize(cross(n, uAxis));
-    vec3 bitangent = cross(n, tangent);
-    
-
-    vec3 rotatedDir = randomDir.x * tangent + randomDir.y * bitangent + randomDir.z * n;
-    
-    float magnitude = length(base);
-    return rotatedDir * magnitude;
-}
-
-
 vec3 reflection(in vec3 position, in vec3 incident, float min_t, float max_t, material mat, out vec3 next_position, out vec3 next_direction){ 
     float t = min_t;
     
@@ -233,27 +191,26 @@ vec3 reflection(in vec3 position, in vec3 incident, float min_t, float max_t, ma
 
     vec3 result = vec3(0);
 
-    int samples = (mat.roughness > 0.1)?16 : 1;
-    for(int i = 0; i < samples; i++){
-        float deviation = pow(mat.roughness, 0.5) * 1;
+
+
+    float deviation = pow(mat.roughness, 0.5) * 1;
         
-        ray_direction = reflect(incident, normal);
-        
-        for(int i = 0; i < 512 && t < max_t; i++){
-            float dist = map(position + ray_direction * t);
-            if(dist < 0.0001){
-                vec3 ambient, diffuse, specular;
-                next_position = position + ray_direction * t; 
-                next_direction = ray_direction;
-                vec3 reflection = render(next_position, ray_direction, ambient, diffuse, specular);
-                
-                result += mix(vec3(0), reflection * mat.albedo, mat.metallic);
-                break;
-            }
-            t += dist;
+    ray_direction = reflect(incident, normal);
+    vec3 ambient, diffuse, specular;
+    for(int i = 0; i < 512 && t < max_t; i++){
+        float dist = map(position + ray_direction * t);
+        if(dist < 0.0001){
+            next_position = position + ray_direction * t; 
+            next_direction = ray_direction;
+            vec3 reflection = render(next_position, ray_direction, ambient, diffuse, specular);
+            
+            result += mix(vec3(0), reflection * mat.albedo, mat.metallic);
+            break;
         }
+        t += dist;
     }
-    return result/samples;
+    
+    return result;
 }
 
 
@@ -292,8 +249,23 @@ void main(){
                 }
                 vec3 next_position, next_direction;
 
-                specular += reflection(ray_position, ray_direction, 0.01, 20.0, bounced_mat, next_position, next_direction);
-                
+                if(bounced_mat.roughness < 0.1){
+                    specular += reflection(ray_position, ray_direction, 0.01, 20.0, bounced_mat, next_position, next_direction);
+                }else{
+                    vec3 tangent = cross(ray_direction, vec3(0, 1.0, 0));
+                    vec3 bitangent = cross(ray_direction, tangent);
+
+                    float e = 0.2;
+                    float samples = 16.0;
+
+                    for(int i = 0; i < samples; i++){
+                        vec3 perturbed = normalize(ray_direction + tangent * e * sin((i*2.0*PI)/samples) + bitangent * e * cos((i*2.0*PI)/samples) );
+                        specular += reflection(ray_position, perturbed, 0.01, 20.0, bounced_mat, next_position, next_direction);
+                    }
+
+
+                    specular /= samples;
+                }
                 ray_position = next_position;
                 ray_direction = next_direction;
                 bounced_mat = map_material(ray_position);
