@@ -18,7 +18,7 @@ main :: proc(){
     sdl3.GL_SetAttribute(sdl3.GLAttr.CONTEXT_PROFILE_MASK, i32(sdl3.GLProfile.CORE))
     sdl3.GL_SetAttribute(sdl3.GLAttr.FRAMEBUFFER_SRGB_CAPABLE, 1)
 
-    window := sdl3.CreateWindow("Playground", 1000, 1400, {.OPENGL, .RESIZABLE})
+    window := sdl3.CreateWindow("Playground", 800, 1000, {.OPENGL, .RESIZABLE})
     defer sdl3.DestroyWindow(window)
 
     gl_context := sdl3.GL_CreateContext(window)
