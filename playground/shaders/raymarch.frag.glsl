@@ -190,10 +190,6 @@ vec3 reflection(in vec3 position, in vec3 incident, float min_t, float max_t, ma
     next_direction = incident;
 
     vec3 result = vec3(0);
-
-
-
-    float deviation = pow(mat.roughness, 0.5) * 1;
         
     ray_direction = reflect(incident, normal);
     vec3 ambient, diffuse, specular;
@@ -255,16 +251,18 @@ void main(){
                     vec3 tangent = cross(ray_direction, vec3(0, 1.0, 0));
                     vec3 bitangent = cross(ray_direction, tangent);
 
-                    float e = 0.2;
-                    float samples = 16.0;
+                    float e = 0.4;
+                    float samples = 64.0;
 
                     for(int i = 0; i < samples; i++){
-                        vec3 perturbed = normalize(ray_direction + tangent * e * sin((i*2.0*PI)/samples) + bitangent * e * cos((i*2.0*PI)/samples) );
+                        vec3 perturbed = normalize(ray_direction + tangent   * sin(i*5000)*e * sin((i*2.0*PI)/samples)
+                                                                 + bitangent * cos(i*500)*e * cos((i*2.0*PI)/samples) );
                         specular += reflection(ray_position, perturbed, 0.01, 20.0, bounced_mat, next_position, next_direction);
                     }
 
-
                     specular /= samples;
+                    color = mix(ambient + diffuse + specular, specular * mat.albedo, mat.metallic);
+                    break;
                 }
                 ray_position = next_position;
                 ray_direction = next_direction;
